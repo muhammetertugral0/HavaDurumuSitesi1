@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <title>Hava Durumu Uygulaması</title>
+    
+    <style>
+        
+        body {
+            font-family: Arial, sans-serif; /* Yazı tipi seçimi */
+            display: flex; /* Esnek yerleşim */
+            justify-content: center; /* Yatayda ortalama */
+            align-items: center; /* Dikeyde ortalama */
+            min-height: 100vh; /* Tam ekran yüksekliği */
+            background-color: #1a1a2e; /* Koyu arka plan rengi */
+            margin: 0; /* Kenar boşluklarını sıfırlama */
+            overflow: hidden; /* Taşan içeriği gizleme */
+        }
+
+        
+        .konteyner {
+            background-color: #6366f1; /* Mor tonlu arka plan */
+            border-radius: 15px; /* Yuvarlatılmış köşeler */
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1); /* Hafif gölgelendirme */
+            padding: 70px; /* İç boşluk */
+            width: 550px; /* Genişlik */
+            text-align: center; /* İçeriği ortala */
+            animation: slide-up 0.6s ease; /* Sayfa yüklenme animasyonu */
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* Sayfa yüklenirken yukarı doğru kayma animasyonu */
+        @keyframes slide-up {
+            from { transform: translateY(50px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        /* Hava durumu ikonu için stil ve animasyon
+         * Dikkat çekici ve dinamik bir görünüm sağlar */
+        .hava-durumu-ikon {
+            font-size: 5rem; /* Büyük boyut */
+            margin-bottom: 20px; /* Alt boşluk */
+            animation: bounce 1.5s infinite; /* Sürekli zıplama efekti */
+            display: inline-block;
+        }
+
+        /* Zıplama animasyonu tanımı */
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-15px); }
+        }
+
+        /* Detay kartları için grid düzeni 
+         * Esnek ve responsive bir tasarım */
+        .detay-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr); /* 3 eşit sütun */
+            gap: 15px; /* Sütunlar arası boşluk */
+            margin-top: 20px;
+        }
+
+        /* Her bir detay kartının stil özellikleri */
+        .detay-kart {
+            background-color: #f8f9fa; /* Açık arka plan rengi */
+            border-radius: 10px; /* Yuvarlatılmış köşeler */
+            padding: 15px;
+            transition: transform 0.3s; /* Hover efekti için geçiş */
+        }
+
+        /* Fare üzerine gelince kartın büyümesi */
+        .detay-kart:hover {
+            transform: scale(1.05);
+        }
+    </style>
+</head>
+<body>
+    
+    <div class="konteyner">
+        <!-- Şehir seçimi ve arama kutusu 
+             Kullanıcının şehir seçmesine sağlar -->
+        <div class="arama-kutusu">
+            <select id="sehirSecimi">
+                <option value="">Şehir Seçin</option>
+                <!-- Türkiye'den farklı şehirlerin enlem ve boylamları -->
+                <option value="istanbul" data-lat="41.0082" data-lon="28.9784">İstanbul</option>
+                <option value="ankara" data-lat="39.9334" data-lon="32.8597">Ankara</option>          
+                <option value="antalya" data-lat="36.8969" data-lon="30.7133">Antalya</option>
+            </select>
+            <button onclick="havaDurumuGetir()">Hava Durumunu Göster</button>
+        </div>
+
+        <!-- Hava durumu bilgileri gösterge alanı -->
+        <div class="hava-bilgisi">
+            <!-- Hava durumu ikonu: Anlık hava durumunu gösterir -->
+            <div class="hava-durumu-ikon" id="havaDurumuIkon">☀️</div>
+            
+            <!-- Seçilen şehrin adı -->
+            <div class="sehir" id="sehirAdi">Şehir Seçiniz</div>
+            
+            <!-- Anlık sıcaklık bilgisi -->
+            <div class="sicaklik" id="sicaklik">--°C</div>
+        </div>
+
+        <!-- Detaylı hava durumu bilgileri -->
+        <div class="detay-grid">
+            <!-- Sıcaklık detayları -->
+            <div class="detay-kart">
+                <div class="detay-baslik">Sıcaklık</div>
+                <div class="detay-deger" id="sicaklikDetay">-- °C</div>
+            </div>
+            
+            <!-- Yağış-->
+            <div class="detay-kart">
+                <div class="detay-baslik">Yağış Olasılığı</div>
+                <div class="detay-deger" id="yagisOlasiligi">--%</div>
+            </div>
+            
+            <!-- Rüzgar hızı -->
+            <div class="detay-kart">
+                <div class="detay-baslik">Rüzgar Hızı</div>
+                <div class="detay-deger" id="ruzgarHizi">-- km/s</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        
+        // Hava durumu ikonları: Farklı hava koşulları için emoji simgeler
+        const havaDurumuIkonlari = {
+            'clear': '☀️',      // Açık hava
+            'partly_cloudy': '⛅', // Kısmen bulutlu
+            'cloudy': '☁️',     // Bulutlu
+            'rain': '🌧️',      // Yağmurlu
+            'thunderstorm': '⛈️', // Fırtınalı
+            'snow': '❄️',      // Karlı
+            'windy': '💨'       // Rüzgarlı
+        };
+
+        // Hava durumu ikonunu belirleyen algoritma
+        // Sıcaklık, yağış olasılığı ve rüzgar hızına göre ikon seçer
+        function havaIkonunuBelirle(sicaklik, yagisOlasiligi, ruzgarHizi) {
+            if (yagisOlasiligi > 50) return havaDurumuIkonlari['rain'];
+            if (ruzgarHizi > 20) return havaDurumuIkonlari['windy'];
+            if (sicaklik > 30) return havaDurumuIkonlari['clear'];
+            if (sicaklik > 20) return havaDurumuIkonlari['partly_cloudy'];
+            if (sicaklik > 10) return havaDurumuIkonlari['cloudy'];
+            return havaDurumuIkonlari['snow'];
+        }
+
+        // Hava durumu bilgisini API'den çeken asenkron fonksiyon
+        async function havaDurumuGetir() {
+            // Seçili şehri al
+            const sehirSecimi = document.getElementById('sehirSecimi');
+            const seciliSecenek = sehirSecimi.options[sehirSecimi.selectedIndex];
+            
+            // Şehir seçimi kontrolü
+            if (!seciliSecenek.value) {
+                alert('Lütfen bir şehir seçin');
+                return;
+            }
+
+            // Seçili şehrin koordinatlarını al
+            const enlem = seciliSecenek.getAttribute('data-lat');
+            const boylam = seciliSecenek.getAttribute('data-lon');
+
+            try {
+                // Open-Meteo API'sinden hava durumu verilerini çek
+                const yanit = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${enlem}&longitude=${boylam}&current_weather=true&hourly=temperature_2m,precipitation_probability,windspeed_10m`);
+                const veriler = await yanit.json();
+
+                // Arayüzü güncelle
+                arayuzuGuncelle(veriler, seciliSecenek.text);
+            } catch (hata) {
+                console.error('Hata:', hata);
+                alert('Hava durumu bilgisi alınamadı');
+            }
+        }
+
+        // Arayüzü güncelleyen fonksiyon
+        function arayuzuGuncelle(veriler, sehirAdi) {
+            // Şehir adını güncelle
+            document.getElementById('sehirAdi').textContent = sehirAdi;
+            
+            // Güncel hava verilerini al
+            const mevcutHavaDurumu = veriler.current_weather;
+            const saatlikVeriler = veriler.hourly;
+
+            // Sıcaklık bilgilerini güncelle
+            const sicaklik = Math.round(mevcutHavaDurumu.temperature);
+            document.getElementById('sicaklik').textContent = `${sicaklik}°C`;
+            document.getElementById('sicaklikDetay').textContent = `${sicaklik}°C`;
+            
+            // Yağış olasılığını güncelle
+            const yagisOlasiligi = saatlikVeriler.precipitation_probability[0];
+            document.getElementById('yagisOlasiligi').textContent = `${yagisOlasiligi}%`;
+            
+            // Rüzgar hızını güncelle
+            const ruzgarHizi = mevcutHavaDurumu.windspeed;
+            document.getElementById('ruzgarHizi').textContent = `${ruzgarHizi} km/s`;
+
+            // Hava durumu ikonunu güncelle
+            const havaIkonu = havaIkonunuBelirle(sicaklik, yagisOlasiligi, ruzgarHizi);
+            document.getElementById('havaDurumuIkon').textContent = havaIkonu;
+        }
+
+        // Sayfa yüklendiğinde varsayılan şehrin hava durumunu geti
+        document.addEventListener('DOMContentLoaded', () => {
+            const varsayilanSehir = document.querySelector('#sehirSecimi option:nth-child(2)');
+            document.getElementById('sehirSecimi').value = varsayilanSehir.value;
+            havaDurumuGetir();
+        });
+    </script>
+</body>
+</html>
